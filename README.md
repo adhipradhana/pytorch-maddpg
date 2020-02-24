@@ -13,5 +13,4 @@ Original implementer by [xuehy](https://github.com/xuehy). Modified for compatib
 ## Dependency
 
 - [pytorch](https://github.com/pytorch/pytorch)
-- [visdom](https://github.com/facebookresearch/visdom)
 - Python 3.7.6 (recommend using the anaconda/miniconda)

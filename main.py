@@ -1,9 +1,10 @@
-from madrl_environments.pursuit import MAWaterWorld_mod
-from MADDPG import MADDPG
-import numpy as np
+import gym
+from gym_unity.envs import UnityEnv
+
 import torch as th
 import visdom
-from params import scale_reward
+
+from MADDPG import MADDPG
 
 # do not render the scene
 e_render = False
