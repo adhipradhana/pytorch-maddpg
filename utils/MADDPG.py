@@ -1,9 +1,9 @@
-from model import Critic, Actor
+from utils.model import Critic, Actor
 import torch
 from copy import deepcopy
-from memory import ReplayMemory, Experience
+from utils.memory import ReplayMemory, Experience
 from torch.optim import Adam
-from randomProcess import OrnsteinUhlenbeckProcess
+from utils.randomProcess import OrnsteinUhlenbeckProcess
 import torch.nn as nn
 import numpy as np
 

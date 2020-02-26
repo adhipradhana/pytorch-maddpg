@@ -4,7 +4,9 @@ from gym_unity.envs import UnityEnv
 import torch as th
 import visdom
 
-from MADDPG import MADDPG
+from utils.MADDPG import MADDPG
+
+MADDPG()
 
 # do not render the scene
 e_render = False
