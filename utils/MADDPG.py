@@ -6,7 +6,7 @@ from torch.optim import Adam
 from utils.randomProcess import OrnsteinUhlenbeckProcess
 import torch.nn as nn
 import numpy as np
-
+import pickle
 
 def soft_update(target, source, t):
     for target_param, source_param in zip(target.parameters(),
@@ -23,10 +23,10 @@ def hard_update(target, source):
 
 class MADDPG:
     def __init__(self, n_agents, dim_obs, dim_act, batch_size,
-                 capacity, episodes_before_train, seed):
-        self.actors = [Actor(dim_obs, dim_act, seed) for i in range(n_agents)]
+                 capacity, episodes_before_train):
+        self.actors = [Actor(dim_obs, dim_act) for i in range(n_agents)]
         self.critics = [Critic(n_agents, dim_obs,
-                               dim_act, seed) for i in range(n_agents)]
+                               dim_act) for i in range(n_agents)]
         self.actors_target = deepcopy(self.actors)
         self.critics_target = deepcopy(self.critics)
 
@@ -138,17 +138,26 @@ class MADDPG:
         return c_loss, a_loss
 
     def select_action(self, state_batch):
-        # state_batch: n_agents x state_dim
+        # state_batch dimention: n_agents x state_dim
+
+        # Define type of tensor
+        FloatTensor = torch.cuda.FloatTensor if self.use_cuda else torch.FloatTensor
+
+        # create actions tensor
         actions = torch.zeros(
             self.n_agents,
             self.n_actions)
-        FloatTensor = torch.cuda.FloatTensor if self.use_cuda else torch.FloatTensor
+
+        # iterating for all agents
         for i in range(self.n_agents):
+            # get all observation
             sb = state_batch[i, :].detach()
+            # calculate forward
             act = self.actors[i](sb.unsqueeze(0)).squeeze()
 
-            act += torch.from_numpy(
-                np.random.randn(2) * self.var[i]).type(FloatTensor)
+            # add random noise
+            # act += torch.from_numpy(
+            #     np.random.randn(2) * self.var[i]).type(FloatTensor)
 
             if self.episode_done > self.episodes_before_train and self.var[i] > 0.05:
                 self.var[i] *= 0.999998
