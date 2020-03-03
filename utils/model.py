@@ -22,10 +22,6 @@ class Critic(nn.Module):
         self.fc3 = nn.Linear(fc2, fc3)
         self.output = nn.Linear(fc3, 1)
 
-        #last layer weight and bias initialization 
-        torch.nn.init.uniform_(self.output.weight, a=-3e-3, b=3e-3)
-        torch.nn.init.uniform_(self.output.bias, a=-3e-3, b=3e-3)
-
     # obs: batch_size * obs_dim
     def forward(self, obs, acts):
         result = F.relu(self.fc1(obs))
@@ -40,7 +36,6 @@ class Critic(nn.Module):
 class Actor(nn.Module):
     def __init__(self, dim_observation, dim_action):
         super(Actor, self).__init__()
-
         fc1 = 64
         fc2 = 64
         
@@ -49,15 +44,11 @@ class Actor(nn.Module):
         self.fc2 = nn.Linear(fc1, fc2)
         self.output = nn.Linear(fc2, dim_action)
 
-        #last layer weight and bias initialization 
-        torch.nn.init.uniform_(self.output.weight, a=-3e-3, b=3e-3)
-        torch.nn.init.uniform_(self.output.bias, a=-3e-3, b=3e-3)
-
     # action output between -2 and 2
     def forward(self, obs):
         result = F.relu(self.fc1(obs))
         result = F.relu(self.fc2(result))
-        result = F.tanh(self.output(result))
+        result = torch.tanh(self.output(result))
 
         return result
 

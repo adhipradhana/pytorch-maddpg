@@ -3,7 +3,6 @@ import torch
 from copy import deepcopy
 from utils.memory import ReplayMemory, Experience
 from torch.optim import Adam
-from utils.randomProcess import OrnsteinUhlenbeckProcess
 import torch.nn as nn
 import numpy as np
 import pickle
@@ -41,7 +40,6 @@ class MADDPG:
         self.GAMMA = 0.95
         self.tau = 0.01
 
-        self.var = [1.0 for i in range(n_agents)]
         self.critic_optimizer = [Adam(x.parameters(),
                                       lr=0.001) for x in self.critics]
         self.actor_optimizer = [Adam(x.parameters(),
@@ -65,7 +63,7 @@ class MADDPG:
         if self.episode_done <= self.episodes_before_train:
             return None, None
 
-        ByteTensor = torch.cuda.ByteTensor if self.use_cuda else torch.ByteTensor
+        BoolTensor = torch.cuda.BoolTensor if self.use_cuda else torch.BoolTensor
         FloatTensor = torch.cuda.FloatTensor if self.use_cuda else torch.FloatTensor
 
         c_loss = []
@@ -73,50 +71,45 @@ class MADDPG:
         for agent in range(self.n_agents):
             transitions = self.memory.sample(self.batch_size)
             batch = Experience(*zip(*transitions))
-            non_final_mask = ByteTensor(list(map(lambda s: s is not None,
-                                                 batch.next_states)))
+            non_final_mask = BoolTensor(list(map(lambda s: s is not None, batch.next_states)))
+            
             # state_batch: batch_size x n_agents x dim_obs
             state_batch = torch.stack(batch.states).type(FloatTensor)
             action_batch = torch.stack(batch.actions).type(FloatTensor)
             reward_batch = torch.stack(batch.rewards).type(FloatTensor)
-            # : (batch_size_non_final) x n_agents x dim_obs
-            non_final_next_states = torch.stack(
-                [s for s in batch.next_states
-                 if s is not None]).type(FloatTensor)
+
+            # non_final_next_states: (batch_size_non_final) x n_agents x dim_obs
+            non_final_next_states = torch.stack([s for s in batch.next_states if s is not None]).type(FloatTensor)
 
             # for current agent
             whole_state = state_batch.view(self.batch_size, -1)
             whole_action = action_batch.view(self.batch_size, -1)
+
+            # calculating current_Q : Q(x, a1, ..., an)
             self.critic_optimizer[agent].zero_grad()
             current_Q = self.critics[agent](whole_state, whole_action)
 
-            non_final_next_actions = [
-                self.actors_target[i](non_final_next_states[:,
-                                                            i,
-                                                            :]) for i in range(
-                                                                self.n_agents)]
+            # calculating for target_Q : y = r + Q(x', a'1, ... , a'n) --> for all states non final
+            # TODO: Implementing inferring of other's agent policy
+            non_final_next_actions = [self.actors_target[i](non_final_next_states[:,i,:]) for i in range(self.n_agents)]
             non_final_next_actions = torch.stack(non_final_next_actions)
-            non_final_next_actions = (
-                non_final_next_actions.transpose(0,
-                                                 1).contiguous())
+            non_final_next_actions = (non_final_next_actions.transpose(0,1).contiguous())
 
-            target_Q = torch.zeros(
-                self.batch_size).type(FloatTensor)
+            target_Q = torch.zeros(self.batch_size).type(FloatTensor)
 
             target_Q[non_final_mask] = self.critics_target[agent](
                 non_final_next_states.view(-1, self.n_agents * self.n_states),
-                non_final_next_actions.view(-1,
-                                            self.n_agents * self.n_actions)
+                non_final_next_actions.view(-1,self.n_agents * self.n_actions)
             ).squeeze()
-            # scale_reward: to scale reward in Q functions
+            
+            target_Q = (target_Q.unsqueeze(1) * self.GAMMA) + (reward_batch[:, agent].unsqueeze(1))
 
-            target_Q = (target_Q.unsqueeze(1) * self.GAMMA) + (
-                reward_batch[:, agent].unsqueeze(1))
-
+            # calculating critic loss from current_Q and target_Q
             loss_Q = nn.MSELoss()(current_Q, target_Q.detach())
             loss_Q.backward()
             self.critic_optimizer[agent].step()
 
+            # calculating actor loss
             self.actor_optimizer[agent].zero_grad()
             state_i = state_batch[:, agent, :]
             action_i = self.actors[agent](state_i)
@@ -152,15 +145,9 @@ class MADDPG:
         for i in range(self.n_agents):
             # get all observation
             sb = state_batch[i, :].detach()
+
             # calculate forward
             act = self.actors[i](sb.unsqueeze(0)).squeeze()
-
-            # add random noise
-            # act += torch.from_numpy(
-            #     np.random.randn(2) * self.var[i]).type(FloatTensor)
-
-            if self.episode_done > self.episodes_before_train and self.var[i] > 0.05:
-                self.var[i] *= 0.999998
 
             actions[i, :] = act
         self.steps_done += 1

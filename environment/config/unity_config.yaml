@@ -2,4 +2,4 @@ mazeRows: 10
 mazeColumns: 10
 healthPackNumber: 10
 bulletPackNumber: 10
-agentNumber: 2
+agentNumber: 4
