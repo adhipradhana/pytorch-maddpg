@@ -5,7 +5,8 @@ from utils.memory import ReplayMemory, Experience
 from torch.optim import Adam
 import torch.nn as nn
 import numpy as np
-import pickle
+import os
+from datetime import datetime
 
 def soft_update(target, source, t):
     for target_param, source_param in zip(target.parameters(),
@@ -153,3 +154,48 @@ class MADDPG:
         self.steps_done += 1
 
         return actions
+
+    def save(self, time, episode):
+        # check path exists
+        cwd = os.getcwd()
+        save_dir = os.path.join(cwd, 'checkpoint')
+        if not os.path.exists(save_dir):
+            os.mkdir(save_dir)
+
+        # create filename
+        time = time.replace(' ','_')
+        filename = 'Time_{}_NAgent_{}_Episode_{}.pth'.format(time, self.n_agents, episode)
+        save_dir = os.path.join(save_dir, filename)
+
+        # create saving dictionary
+        checkpoint = dict()
+
+        # saving model
+        for i in range(self.n_agents):
+            checkpoint['actor_{}'.format(i)] = self.actors[i].state_dict()
+            checkpoint['critic_{}'.format(i)] = self.critics[i].state_dict()
+            checkpoint['actor_target_{}'.format(i)] = self.actors_target[i].state_dict()
+            checkpoint['critic_target_{}'.format(i)] = self.critics_target[i].state_dict()
+            checkpoint['actor_optimizer_{}'.format(i)] = self.actor_optimizer[i].state_dict()
+            checkpoint['critic_optimizer_{}'.format(i)] = self.critic_optimizer[i].state_dict()
+        
+        # saving model info
+        checkpoint['n_agents'] = self.n_agents
+        checkpoint['episode'] = episode
+        checkpoint['time'] = str(datetime.now())
+
+        # save
+        torch.save(checkpoint, save_dir)
+
+    def load(self, path):
+        checkpoint = torch.load(path)
+
+        # loading model
+        for i in range(self.n_agents):
+            self.actors[i].load_state_dict(checkpoint['actor_{}'.format(i)])
+            self.critics[i].load_state_dict(checkpoint['critic_{}'.format(i)])
+            self.actors_target[i].load_state_dict(checkpoint['actor_target_{}'.format(i)])
+            self.critics_target[i].load_state_dict(checkpoint['critic_target_{}'.format(i)])
+            self.actor_optimizer[i].load_state_dict(checkpoint['actor_optimizer_{}'.format(i)])
+            self.critic_optimizer[i].load_state_dict(checkpoint['critic_optimizer_{}'.format(i)])
+
