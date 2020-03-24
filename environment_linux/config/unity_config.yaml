@@ -1,0 +1,6 @@
+mazeRows: 4
+mazeColumns: 4
+healthPackNumber: 3
+bulletPackNumber: 3
+agentNumber: 2
+generateStep: 10000
