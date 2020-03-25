@@ -187,8 +187,8 @@ class MADDPG:
         # save
         torch.save(checkpoint, save_dir)
 
-    def load(self, path):
-        checkpoint = torch.load(path)
+    def load(self, path, map_location):
+        checkpoint = torch.load(path, map_location=map_location)
 
         # loading model
         for i in range(self.n_agents):
