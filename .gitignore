@@ -2,3 +2,5 @@
 __pycache__/
 *.zip
 environment_linux/
+environment/
+.DS_Store
