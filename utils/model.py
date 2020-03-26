@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class Critic(nn.Module):
     def __init__(self, n_agent, dim_observation, dim_action):
         super(Critic, self).__init__()
@@ -10,45 +9,32 @@ class Critic(nn.Module):
         self.dim_observation = dim_observation
         self.dim_action = dim_action
         obs_dim = dim_observation * n_agent
-        act_dim = dim_action * n_agent
+        act_dim = self.dim_action * n_agent
 
-        fc1 = 256
-        fc2 = 256
-        fc3 = 256
-
-        # input layer
-        self.fc1 = nn.Linear(obs_dim, fc1)
-        self.fc2 = nn.Linear(fc1+act_dim, fc2)
-        self.fc3 = nn.Linear(fc2, fc3)
-        self.output = nn.Linear(fc3, 1)
+        self.FC1 = nn.Linear(obs_dim, 1024)
+        self.FC2 = nn.Linear(1024+act_dim, 512)
+        self.FC3 = nn.Linear(512, 300)
+        self.FC4 = nn.Linear(300, 1)
 
     # obs: batch_size * obs_dim
     def forward(self, obs, acts):
-        result = F.relu(self.fc1(obs))
+        result = F.relu(self.FC1(obs))
         combined = torch.cat([result, acts], 1)
-        result = F.relu(self.fc2(combined))
-        result = F.relu(self.fc3(result))
-        result = self.output(F.relu(result))
-
-        return result
+        result = F.relu(self.FC2(combined))
+        return self.FC4(F.relu(self.FC3(result)))
 
 
 class Actor(nn.Module):
     def __init__(self, dim_observation, dim_action):
         super(Actor, self).__init__()
-        fc1 = 64
-        fc2 = 64
-        
-        # network mapping state to action 
-        self.fc1 = nn.Linear(dim_observation, fc1)
-        self.fc2 = nn.Linear(fc1, fc2)
-        self.output = nn.Linear(fc2, dim_action)
+        self.FC1 = nn.Linear(dim_observation, 500)
+        self.FC2 = nn.Linear(500, 128)
+        self.FC3 = nn.Linear(128, dim_action)
 
     # action output between -2 and 2
     def forward(self, obs):
-        result = F.relu(self.fc1(obs))
-        result = F.relu(self.fc2(result))
-        result = torch.tanh(self.output(result))
-
+        result = F.relu(self.FC1(obs))
+        result = F.relu(self.FC2(result))
+        result = torch.tanh(self.FC3(result))
         return result
 
