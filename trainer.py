@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 
 # # Battle Royale Environment Trainer
@@ -12,8 +12,6 @@
 import sys
 from gym_unity.envs import UnityEnv
 
-get_ipython().run_line_magic('matplotlib', 'inline')
-
 print("Python version:")
 print(sys.version)
 print(sys.executable)
@@ -25,21 +23,21 @@ if (sys.version_info[0] < 3):
 
 # ## Start Environment
 
-# In[11]:
+# In[2]:
 
 
 # Environment name
 # Remember to put battle royale environment configuration within the config folder
-env_name = "environment_linux/battle-royale-static.x86_64"
+env_name = "environment/battle-royale-static"
 
-env = UnityEnv(env_name, worker_id=4, use_visual=False, multiagent=True)
+env = UnityEnv(env_name, worker_id=3, use_visual=False, multiagent=True)
 
 print(str(env))
 
 
 # ## Examine Observation Space
 
-# In[12]:
+# In[3]:
 
 
 # Examine observation space
@@ -49,7 +47,7 @@ print("Agent observation space type: {}".format(observation))
 
 # ## Examine Action Space
 
-# In[13]:
+# In[4]:
 
 
 # Examine action space
@@ -62,7 +60,7 @@ print("Agent action space type: {}".format(action))
 
 # ### Setup Algorithm Dependencies
 
-# In[14]:
+# In[6]:
 
 
 from datetime import datetime
@@ -71,29 +69,28 @@ import visdom
 import numpy as np
 
 from utils.MADDPG import MADDPG
-from utils.RandomProcess import OUNoise
 
 
 # ### Setup Algoritm Parameters
 
-# In[15]:
+# In[7]:
 
 
-random_seed = 4966
+random_seed = 6272727
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 n_agents = env.number_agents
-n_episode = 200
-max_steps = 10000
+n_episode = 10000
+max_steps = 2000
 buffer_capacity = 1000000
 batch_size = 1000
-episodes_before_train = 10
-checkpoint_episode = 20
+episodes_before_train = 100
+checkpoint_episode = 1000
 
 
 # ### Setup MADDPG
 
-# In[16]:
+# In[9]:
 
 
 # setup seed
@@ -101,7 +98,6 @@ torch.manual_seed(random_seed)
 np.random.seed(random_seed)
 
 maddpg = MADDPG(n_agents, n_states, n_actions, batch_size, buffer_capacity, episodes_before_train)
-noise = OUNoise(env.action_space)
 
 FloatTensor = torch.cuda.FloatTensor if maddpg.use_cuda else torch.FloatTensor
 
@@ -122,7 +118,6 @@ for i_episode in range(n_episode):
     # reset environment
     obs = env.reset()
     obs = np.stack(obs)
-    noise.reset()
     
     # convert observation to tensor
     if isinstance(obs, np.ndarray):
@@ -133,7 +128,7 @@ for i_episode in range(n_episode):
     for i_step in range(max_steps):
         obs = obs.type(FloatTensor)
         actions = maddpg.select_action(obs).data.cpu()
-        actions_list = [noise.get_action(action) for action in actions.tolist()]
+        actions_list = actions.tolist()
         
         obs_, reward, done, _ = env.step(actions_list)
 
@@ -168,7 +163,7 @@ for i_episode in range(n_episode):
     if win is None:
         win = vis.line(X=np.arange(i_episode, i_episode+1),
                        Y=np.array([
-                           np.append(total_reward.cpu(), rr)]),
+                           np.append(total_reward, rr)]),
                        opts=dict(
                            ylabel="Reward",
                            xlabel="Episode",
@@ -180,7 +175,7 @@ for i_episode in range(n_episode):
     else:
         vis.line(X=np.array(
             [np.array(i_episode).repeat(n_agents+1)]),
-                 Y=np.array([np.append(total_reward.cpu(),rr)]),
+                 Y=np.array([np.append(total_reward,rr)]),
                  win=win,
                  update="append")
         
@@ -191,8 +186,14 @@ for i_episode in range(n_episode):
 
 # ## Close Environment
 
-# In[9]:
+# In[11]:
 
 
 env.close()
+
+
+# In[ ]:
+
+
+
 
