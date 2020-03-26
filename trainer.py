@@ -6,7 +6,7 @@
 
 # ## Setup Environment Dependencies
 
-# In[1]:
+# In[ ]:
 
 
 import sys
@@ -23,7 +23,7 @@ if (sys.version_info[0] < 3):
 
 # ## Start Environment
 
-# In[2]:
+# In[ ]:
 
 
 # Environment name
@@ -37,7 +37,7 @@ print(str(env))
 
 # ## Examine Observation Space
 
-# In[3]:
+# In[ ]:
 
 
 # Examine observation space
@@ -47,7 +47,7 @@ print("Agent observation space type: {}".format(observation))
 
 # ## Examine Action Space
 
-# In[4]:
+# In[ ]:
 
 
 # Examine action space
@@ -60,7 +60,7 @@ print("Agent action space type: {}".format(action))
 
 # ### Setup Algorithm Dependencies
 
-# In[6]:
+# In[ ]:
 
 
 from datetime import datetime
@@ -73,7 +73,7 @@ from utils.MADDPG import MADDPG
 
 # ### Setup Algoritm Parameters
 
-# In[7]:
+# In[ ]:
 
 
 random_seed = 6272727
@@ -81,7 +81,7 @@ n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 n_agents = env.number_agents
 n_episode = 10000
-max_steps = 2000
+max_steps = 100
 buffer_capacity = 1000000
 batch_size = 1000
 episodes_before_train = 100
@@ -90,7 +90,7 @@ checkpoint_episode = 1000
 
 # ### Setup MADDPG
 
-# In[9]:
+# In[ ]:
 
 
 # setup seed
@@ -106,12 +106,12 @@ vis = visdom.Visdom(port=8097)
 
 # ### MADDPG Training
 
-# In[ ]:
+# In[30]:
 
 
 win = None
 current_time = str(datetime.now())
-reward_record = []
+reward_record = [[] for i in range(n_agents+1)]
 
 print("Exploration begins...")
 for i_episode in range(n_episode):
@@ -154,28 +154,32 @@ for i_episode in range(n_episode):
 
     maddpg.episode_done += 1
     print("Episode: {}, reward = {}".format(i_episode, total_reward))
-    reward_record.append(total_reward)
     
+    reward_record[0].append(total_reward.cpu())  
+    for i in range(n_agents):
+        reward_record[i+1].append(rr[i])
+    
+    y_axis = np.asarray([np.mean(reward_record[i]) for i in range(n_agents+1)]).reshape((1,4))
+  
     if maddpg.episode_done == maddpg.episodes_before_train:
         print("Training begins...")
         print("MADDPG on Battle Royale")
               
     if win is None:
         win = vis.line(X=np.arange(i_episode, i_episode+1),
-                       Y=np.array([
-                           np.append(total_reward, rr)]),
+                       Y=np.array(y_axis),
                        opts=dict(
-                           ylabel="Reward",
+                           ylabel="Average Reward",
                            xlabel="Episode",
                            title="MADDPG on Battle Royale | " + \
                                "Agent: {} | ".format(n_agents) + \
                                "Time: {}\n".format(current_time),
                            legend=["Total"] +
-                           ["Agent-".format(i) for i in range(n_agents)]))
+                           ["Agent-{}".format(i) for i in range(n_agents)]))
     else:
         vis.line(X=np.array(
             [np.array(i_episode).repeat(n_agents+1)]),
-                 Y=np.array([np.append(total_reward,rr)]),
+                 Y=np.array(y_axis),
                  win=win,
                  update="append")
         
@@ -186,7 +190,7 @@ for i_episode in range(n_episode):
 
 # ## Close Environment
 
-# In[11]:
+# In[ ]:
 
 
 env.close()
