@@ -41,6 +41,9 @@ class MADDPG:
         self.GAMMA = 0.95
         self.tau = 0.01
 
+        # for gaussian noise
+        self.var = [1.0 for i in range(n_agents)]
+
         self.critic_optimizer = [Adam(x.parameters(),
                                       lr=0.001) for x in self.critics]
         self.actor_optimizer = [Adam(x.parameters(),
@@ -149,6 +152,15 @@ class MADDPG:
 
             # calculate forward
             act = self.actors[i](sb.unsqueeze(0)).squeeze()
+            
+            ## add gaussian noise
+            act += torch.from_numpy(
+                np.random.randn(self.n_actions) * self.var[i]).type(FloatTensor)
+
+            # update gaussian noise
+            if self.episode_done > self.episodes_before_train and self.var[i] > 0.05:
+                self.var[i] *= 0.999998
+            act = torch.clamp(act, -1.0, 1.0)
 
             actions[i, :] = act
         self.steps_done += 1
@@ -178,6 +190,7 @@ class MADDPG:
             checkpoint['critic_target_{}'.format(i)] = self.critics_target[i].state_dict()
             checkpoint['actor_optimizer_{}'.format(i)] = self.actor_optimizer[i].state_dict()
             checkpoint['critic_optimizer_{}'.format(i)] = self.critic_optimizer[i].state_dict()
+            checkpoint['var_{}'.format(i)] = self.var[i]
         
         # saving model info
         checkpoint['n_agents'] = self.n_agents
@@ -198,4 +211,5 @@ class MADDPG:
             self.critics_target[i].load_state_dict(checkpoint['critic_target_{}'.format(i)])
             self.actor_optimizer[i].load_state_dict(checkpoint['actor_optimizer_{}'.format(i)])
             self.critic_optimizer[i].load_state_dict(checkpoint['critic_optimizer_{}'.format(i)])
+            self.var[i] = checkpoint['var_{}'.format(i)]
 
