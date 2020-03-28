@@ -155,7 +155,7 @@ class MADDPG:
             
             ## add gaussian noise
             act += torch.from_numpy(
-                np.random.randn(self.n_actions) * self.var[i]).type(FloatTensor)
+                np.random.randn(self.n_actions)  * 0.5 * self.var[i]).type(FloatTensor)
 
             # update gaussian noise
             if self.episode_done > self.episodes_before_train and self.var[i] > 0.05:
