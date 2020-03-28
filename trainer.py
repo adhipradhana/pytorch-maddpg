@@ -6,7 +6,7 @@
 
 # ## Setup Environment Dependencies
 
-# In[ ]:
+# In[1]:
 
 
 import sys
@@ -23,7 +23,7 @@ if (sys.version_info[0] < 3):
 
 # ## Start Environment
 
-# In[ ]:
+# In[2]:
 
 
 # Environment name
@@ -37,7 +37,7 @@ print(str(env))
 
 # ## Examine Observation Space
 
-# In[ ]:
+# In[3]:
 
 
 # Examine observation space
@@ -47,7 +47,7 @@ print("Agent observation space type: {}".format(observation))
 
 # ## Examine Action Space
 
-# In[ ]:
+# In[4]:
 
 
 # Examine action space
@@ -60,7 +60,7 @@ print("Agent action space type: {}".format(action))
 
 # ### Setup Algorithm Dependencies
 
-# In[ ]:
+# In[5]:
 
 
 from datetime import datetime
@@ -73,24 +73,24 @@ from utils.MADDPG import MADDPG
 
 # ### Setup Algoritm Parameters
 
-# In[ ]:
+# In[6]:
 
 
-random_seed = 6272727
+random_seed = 13516035
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 n_agents = env.number_agents
 n_episode = 10000
-max_steps = 100
+max_steps = 1000
 buffer_capacity = 1000000
 batch_size = 1000
 episodes_before_train = 100
-checkpoint_episode = 1000
+checkpoint_episode = 500
 
 
 # ### Setup MADDPG
 
-# In[ ]:
+# In[7]:
 
 
 # setup seed
@@ -101,15 +101,16 @@ maddpg = MADDPG(n_agents, n_states, n_actions, batch_size, buffer_capacity, epis
 
 FloatTensor = torch.cuda.FloatTensor if maddpg.use_cuda else torch.FloatTensor
 
-vis = visdom.Visdom(port=8097)
+vis = visdom.Visdom(port=8097, log_to_filename='log/maddpg.log')
 
 
 # ### MADDPG Training
 
-# In[30]:
+# In[ ]:
 
 
-win = None
+win_avg = None
+win_curr = None
 current_time = str(datetime.now())
 reward_record = [[] for i in range(n_agents+1)]
 
@@ -165,13 +166,13 @@ for i_episode in range(n_episode):
         print("Training begins...")
         print("MADDPG on Battle Royale")
               
-    if win is None:
-        win = vis.line(X=np.arange(i_episode, i_episode+1),
+    if win_avg is None:
+        win_avg = vis.line(X=np.arange(i_episode, i_episode+1),
                        Y=np.array(y_axis),
                        opts=dict(
                            ylabel="Average Reward",
                            xlabel="Episode",
-                           title="MADDPG on Battle Royale | " + \
+                           title="Average Reward | MADDPG on Battle Royale | " + \
                                "Agent: {} | ".format(n_agents) + \
                                "Time: {}\n".format(current_time),
                            legend=["Total"] +
@@ -180,7 +181,26 @@ for i_episode in range(n_episode):
         vis.line(X=np.array(
             [np.array(i_episode).repeat(n_agents+1)]),
                  Y=np.array(y_axis),
-                 win=win,
+                 win=win_avg,
+                 update="append")
+        
+    if win_curr is None:
+        win_curr = vis.line(X=np.arange(i_episode, i_episode+1),
+                       Y=np.array([
+                           np.append(total_reward, rr)]),
+                       opts=dict(
+                           ylabel="Reward",
+                           xlabel="Episode",
+                           title="Current Reward | MADDPG on Battle Royale | " + \
+                               "Agent: {} | ".format(n_agents) + \
+                               "Time: {}\n".format(current_time),
+                           legend=["Total"] +
+                           ["Agent-".format(i) for i in range(n_agents)]))
+    else:
+        vis.line(X=np.array(
+            [np.array(i_episode).repeat(n_agents+1)]),
+                 Y=np.array([np.append(total_reward,rr)]),
+                 win=win_curr,
                  update="append")
         
     # save model
@@ -190,7 +210,7 @@ for i_episode in range(n_episode):
 
 # ## Close Environment
 
-# In[ ]:
+# In[9]:
 
 
 env.close()
