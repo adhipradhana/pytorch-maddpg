@@ -3,4 +3,4 @@ mazeColumns: 4
 healthPackNumber: 3
 bulletPackNumber: 3
 agentNumber: 3
-generateStep: 500
+generateStep: 400
