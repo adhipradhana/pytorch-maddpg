@@ -30,7 +30,7 @@ if (sys.version_info[0] < 3):
 # Remember to put battle royale environment configuration within the config folder
 env_name = "environment/battle-royale-static"
 
-env = UnityEnv(env_name, worker_id=3, use_visual=False, multiagent=True)
+env = UnityEnv(env_name, worker_id=4, use_visual=False, multiagent=True)
 
 print(str(env))
 
@@ -42,6 +42,7 @@ print(str(env))
 
 # Examine observation space
 observation = env.observation_space
+env.reset()
 print("Agent observation space type: {}".format(observation))
 
 
@@ -67,6 +68,7 @@ from datetime import datetime
 import torch
 import visdom
 import numpy as np
+import random
 
 from utils.MADDPG import MADDPG
 
@@ -76,12 +78,12 @@ from utils.MADDPG import MADDPG
 # In[6]:
 
 
-random_seed = 13516035
+random_seed = random.randint(0,1000000)
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 n_agents = env.number_agents
-n_episode = 10000
-max_steps = 1000
+n_episode = 100
+max_steps = 250
 buffer_capacity = 1000000
 batch_size = 1000
 episodes_before_train = 100
@@ -90,7 +92,7 @@ checkpoint_episode = 500
 
 # ### Setup MADDPG
 
-# In[7]:
+# In[8]:
 
 
 # setup seed
@@ -132,7 +134,7 @@ for i_episode in range(n_episode):
         actions_list = actions.tolist()
         
         obs_, reward, done, _ = env.step(actions_list)
-
+        
         reward = torch.FloatTensor(reward).type(FloatTensor)
         obs_ = np.stack(obs_)
         obs_ = torch.from_numpy(obs_).float()
@@ -148,8 +150,8 @@ for i_episode in range(n_episode):
         obs = next_obs
 
         c_loss, a_loss = maddpg.update_policy()
+
         
-        # check if done
         if True in done:
             break
 

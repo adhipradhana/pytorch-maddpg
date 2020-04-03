@@ -1,6 +1,8 @@
 mazeRows: 4
 mazeColumns: 4
-healthPackNumber: 3
+healthPackNumber: 0
 bulletPackNumber: 3
 agentNumber: 3
-generateStep: 400
+normalCount: 3
+aggresiveCount: 0
+generateStep: 300
