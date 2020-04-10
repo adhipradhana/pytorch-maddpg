@@ -1,7 +1,7 @@
-mazeRows: 4
-mazeColumns: 4
+mazeRows: 6
+mazeColumns: 6
 healthPackNumber: 0
-bulletPackNumber: 3
+bulletPackNumber: 7
 agentNumber: 3
 normalCount: 3
 aggresiveCount: 0

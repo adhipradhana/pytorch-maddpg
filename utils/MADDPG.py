@@ -213,3 +213,19 @@ class MADDPG:
             self.critic_optimizer[i].load_state_dict(checkpoint['critic_optimizer_{}'.format(i)])
             self.var[i] = checkpoint['var_{}'.format(i)]
 
+    def load_agent(self, path, agent_number, map_location):
+        '''strictly for testing, do not use for resume training due to critic's network's size differents'''
+
+        checkpoint = torch.load(path, map_location=map_location)
+
+        #loading from 1 agent
+        if agent_number >= self.n_agents or agent_number < 0:
+            agent_number = 0
+
+        for i in range(self.n_agents):
+            self.actors[i].load_state_dict(checkpoint['actor_{}'.format(agent_number)])
+            self.actors_target[i].load_state_dict(checkpoint['actor_target_{}'.format(agent_number)])
+            self.actor_optimizer[i].load_state_dict(checkpoint['actor_optimizer_{}'.format(agent_number)])
+            self.var[i] = checkpoint['var_{}'.format(agent_number)]
+
+
