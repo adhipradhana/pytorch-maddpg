@@ -1,4 +1,5 @@
 from utils.model import Critic, Actor
+from utils.ProbabilityDistributions import make_pd
 import torch
 from copy import deepcopy
 from utils.memory import ReplayMemory, Experience
@@ -213,7 +214,22 @@ class MADDPG:
             self.critic_optimizer[i].load_state_dict(checkpoint['critic_optimizer_{}'.format(i)])
             self.var[i] = checkpoint['var_{}'.format(i)]
 
-    def load_agent(self, path, agent_number, map_location):
+    def load_all_agent(self, path, model_number, map_location):
+        '''strictly for testing, do not use for resume training due to critic's network's size differents'''
+
+        checkpoint = torch.load(path, map_location=map_location)
+
+        #loading from 1 agent
+        if model_number >= self.n_agents or model_number < 0:
+            model_number = 0
+
+        for i in range(self.n_agents):
+            self.actors[i].load_state_dict(checkpoint['actor_{}'.format(model_number)])
+            self.actors_target[i].load_state_dict(checkpoint['actor_target_{}'.format(model_number)])
+            self.actor_optimizer[i].load_state_dict(checkpoint['actor_optimizer_{}'.format(model_number)])
+            self.var[i] = checkpoint['var_{}'.format(model_number)]
+
+    def load_agent(self, path, agent_number, model_number, map_location):
         '''strictly for testing, do not use for resume training due to critic's network's size differents'''
 
         checkpoint = torch.load(path, map_location=map_location)
@@ -222,10 +238,11 @@ class MADDPG:
         if agent_number >= self.n_agents or agent_number < 0:
             agent_number = 0
 
-        for i in range(self.n_agents):
-            self.actors[i].load_state_dict(checkpoint['actor_{}'.format(agent_number)])
-            self.actors_target[i].load_state_dict(checkpoint['actor_target_{}'.format(agent_number)])
-            self.actor_optimizer[i].load_state_dict(checkpoint['actor_optimizer_{}'.format(agent_number)])
-            self.var[i] = checkpoint['var_{}'.format(agent_number)]
+        if model_number >= self.n_agents or model_number < 0:
+            model_number = 0
 
+        self.actors[agent_number].load_state_dict(checkpoint['actor_{}'.format(model_number)])
+        self.actors_target[agent_number].load_state_dict(checkpoint['actor_target_{}'.format(model_number)])
+        self.actor_optimizer[agent_number].load_state_dict(checkpoint['actor_optimizer_{}'.format(model_number)])
+        self.var[agent_number] = checkpoint['var_{}'.format(model_number)]
 
