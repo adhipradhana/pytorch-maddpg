@@ -82,12 +82,12 @@ random_seed = random.randint(0,1000000)
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 n_agents = env.number_agents
-n_episode = 100
-max_steps = 250
+n_episode = 5000
+max_steps = 100
 buffer_capacity = 1000000
 batch_size = 1000
 episodes_before_train = 100
-checkpoint_episode = 500
+checkpoint_episode = 1000
 
 
 # ### Setup MADDPG
@@ -197,7 +197,7 @@ for i_episode in range(n_episode):
                                "Agent: {} | ".format(n_agents) + \
                                "Time: {}\n".format(current_time),
                            legend=["Total"] +
-                           ["Agent-".format(i) for i in range(n_agents)]))
+                           ["Agent-{}".format(i) for i in range(n_agents)]))
     else:
         vis.line(X=np.array(
             [np.array(i_episode).repeat(n_agents+1)]),
