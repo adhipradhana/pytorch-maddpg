@@ -1,9 +1,9 @@
-from utils.model import Critic, Actor
-from utils.ProbabilityDistributions import make_pd
+from utils.model import Critic, Actor, ApproxPolicy
 import torch
 from copy import deepcopy
 from utils.memory import ReplayMemory, Experience
 from torch.optim import Adam
+from torch.distributions import Normal
 import torch.nn as nn
 import numpy as np
 import os
@@ -24,7 +24,7 @@ def hard_update(target, source):
 
 class MADDPG:
     def __init__(self, n_agents, dim_obs, dim_act, batch_size,
-                 capacity, episodes_before_train):
+                 capacity, episodes_before_train, use_approx=False):
         self.actors = [Actor(dim_obs, dim_act) for i in range(n_agents)]
         self.critics = [Critic(n_agents, dim_obs,
                                dim_act) for i in range(n_agents)]
@@ -42,6 +42,8 @@ class MADDPG:
         self.GAMMA = 0.95
         self.tau = 0.01
 
+        self.use_approx = use_approx
+
         # for gaussian noise
         self.var = [1.0 for i in range(n_agents)]
 
@@ -49,6 +51,12 @@ class MADDPG:
                                       lr=0.001) for x in self.critics]
         self.actor_optimizer = [Adam(x.parameters(),
                                      lr=0.0001) for x in self.actors]
+
+        if (self.use_approx):
+            self.approx_policies = [[ApproxPolicy(dim_obs, dim_act) if i != j else None for i in range(self.n_agents)] for j in range(self.n_agents)]
+            self.approx_targets = deepcopy(self.approx_policies)
+            self.approx_optimizer = [[Adam(x.parameters(),
+                                     lr=0.001) for x in approx_actor if x is not None] for approx_actor in self.approx_policies]
 
         if self.use_cuda:
             for x in self.actors:
@@ -60,8 +68,16 @@ class MADDPG:
             for x in self.critics_target:
                 x.cuda()
 
+            if self.use_approx:
+                for i in range(self.n_agents):
+                    for j in range(self.n_agents):
+                        if self.approx_policies[i][j] is not None:
+                            self.approx_policies[i][j].cuda()
+                            self.approx_targets[i][j].cuda()
+
         self.steps_done = 0
         self.episode_done = 0
+
 
     def update_policy(self):
         # do not train until exploration is enough
@@ -94,9 +110,19 @@ class MADDPG:
             self.critic_optimizer[agent].zero_grad()
             current_Q = self.critics[agent](whole_state, whole_action)
 
-            # calculating for target_Q : y = r + Q(x', a'1, ... , a'n) --> for all states non final
-            # TODO: Implementing inferring of other's agent policy
-            non_final_next_actions = [self.actors_target[i](non_final_next_states[:,i,:]) for i in range(self.n_agents)]
+            # calculating for target_Q : y = r + Q(x', a'1, ... , a'n) --> for all states non final 
+            non_final_next_actions = None
+
+            if self.use_approx:
+                self.update_approx_policy(agent)
+
+                param_list = [self.approx_targets[agent][i](non_final_next_states[:,i,:]) if i != agent else None for i in range(self.n_agents)]
+                act_pd_n = [Normal(*param) if param is not None else None for param in param_list]
+                non_final_next_actions = [act_pd.sample() if act_pd is not None else None for act_pd in act_pd_n]
+                non_final_next_actions[agent] = self.actors_target[i](non_final_next_states[:,agent,:])
+            else:
+                non_final_next_actions = [self.actors_target[i](non_final_next_states[:,i,:]) for i in range(self.n_agents)]
+
             non_final_next_actions = torch.stack(non_final_next_actions)
             non_final_next_actions = (non_final_next_actions.transpose(0,1).contiguous())
 
@@ -167,6 +193,49 @@ class MADDPG:
         self.steps_done += 1
 
         return actions
+
+    def update_approx_policy(self, agent_idx):
+        # implementing infering policy of other's agent
+        # get latest sample
+        latest_sample = self.memory.latest_sample()
+        experience = Experience(*zip(*latest_sample))
+
+        latest_state = torch.stack(experience.states).type(FloatTensor).squeeze()
+        latest_action = torch.stack(experience.actions).type(FloatTensor).squeeze()
+
+        # update for each approx policy
+        for i in range(self.n_agents):
+            if i == agent_idx: continue
+
+            # run neural network for getting param
+            self.approx_optimizer[agent_idx][i].zero_grad()
+            param = self.approx_policies[agent_idx][i](latest_state[i,:])
+
+            ## create normal distribution from param
+            act_pd = Normal(*param)
+
+            # get sample act
+            act_sample = act_pd.sample()
+
+            # calculate entrophy loss
+            p_reg = -torch.mean(act_pd.entropy())
+
+            # calculate log prob loss
+            act_target = latest_action
+            pg_loss = -torch.mean(act_pd.log_prob(act_target))
+
+            loss = pg_loss + p_reg * 1e-3
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.approx_policies[agent_idx][i].parameters(), 1)
+            self.approx_optimizer[agent_idx][i].step()
+
+            # target network
+            soft_update(self.approx_targets[agent_idx][i], self.approx_policies[agent_idx][i], self.tau)
+
+            # TODO : calculate KL difference, can't do it right now because I use different type neural network for
+            # approximation and target network. The approx network is outputting parameters for distribution, 
+            # meanwhile target network is outputting direct actions.
+
 
     def save(self, time, episode):
         # check path exists

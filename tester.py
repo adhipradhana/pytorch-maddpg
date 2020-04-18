@@ -8,9 +8,12 @@
 
 # In[ ]:
 
-
+import torch
+import random
 import sys
+import numpy as np
 from gym_unity.envs import UnityEnv
+from utils.MADDPG import MADDPG
 
 print("Python version:")
 print(sys.version)
@@ -28,29 +31,27 @@ if (sys.version_info[0] < 3):
 
 # Environment name
 # Remember to put battle royale environment configuration within the config folder
-env_name = "environment/battle-royale-static"
+env_name = "environment/new/battle-royale-static"
 
-env = UnityEnv(env_name, worker_id=3, use_visual=False, multiagent=True)
+env = UnityEnv(env_name, worker_id=0, use_visual=False, multiagent=True)
 
 print(str(env))
 
-
-# ## Testing Model
 
 # ## Model Variables
 
 # In[ ]:
 
 
-random_seed = 6272727
+random_seed = random.randint(0,1000000)
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 n_agents = env.number_agents
-n_episode = 50
-max_steps = 2000
-buffer_capacity = 1000000
-batch_size = 1000
-episodes_before_train = 50
+n_episode = 15
+max_steps = 10
+buffer_capacity = 1000
+batch_size = 10
+episodes_before_train = 5
 
 
 # In[ ]:
@@ -60,20 +61,9 @@ episodes_before_train = 50
 torch.manual_seed(random_seed)
 np.random.seed(random_seed)
 
-maddpg = MADDPG(n_agents, n_states, n_actions, batch_size, buffer_capacity, episodes_before_train)
+maddpg = MADDPG(n_agents, n_states, n_actions, batch_size, buffer_capacity, episodes_before_train, use_approx=True)
 
 FloatTensor = torch.cuda.FloatTensor if maddpg.use_cuda else torch.FloatTensor
-
-
-# ## Loading Model
-
-# In[ ]:
-
-
-import os
-
-path = os.path.join(os.getcwd(), 'checkpoint', 'Time_2020-03-25_08-42-13.632845_NAgent_2', 'Time_2020-03-25_08-42-13.632845_NAgent_2_Episode_180.pth')
-maddpg.load(path, map_location='cpu')
 
 
 # ## Run Model
