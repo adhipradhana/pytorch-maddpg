@@ -162,7 +162,7 @@ for i_episode in range(n_episode):
     for i in range(n_agents):
         reward_record[i+1].append(rr[i])
     
-    y_axis = np.asarray([np.mean(reward_record[i]) for i in range(n_agents+1)]).reshape((1,4))
+    y_axis = np.asarray([np.mean(reward_record[i]) for i in range(n_agents+1)]).reshape((1,n_agents+1))
   
     if maddpg.episode_done == maddpg.episodes_before_train:
         print("Training begins...")

@@ -14,6 +14,7 @@ import sys
 import numpy as np
 from gym_unity.envs import UnityEnv
 from utils.MADDPG import MADDPG
+from datetime import datetime
 
 print("Python version:")
 print(sys.version)
@@ -33,7 +34,7 @@ if (sys.version_info[0] < 3):
 # Remember to put battle royale environment configuration within the config folder
 env_name = "environment/new/battle-royale-static"
 
-env = UnityEnv(env_name, worker_id=0, use_visual=False, multiagent=True)
+env = UnityEnv(env_name, worker_id=1, use_visual=False, multiagent=True)
 
 print(str(env))
 
@@ -50,7 +51,7 @@ n_agents = env.number_agents
 n_episode = 15
 max_steps = 10
 buffer_capacity = 1000
-batch_size = 10
+batch_size = 7
 episodes_before_train = 5
 
 
@@ -70,7 +71,7 @@ FloatTensor = torch.cuda.FloatTensor if maddpg.use_cuda else torch.FloatTensor
 
 # In[ ]:
 
-
+current_time = str(datetime.now())
 print("Testing model...")
 for i_episode in range(n_episode):
     # reset environment
@@ -82,6 +83,7 @@ for i_episode in range(n_episode):
         obs = torch.from_numpy(obs).float()
     
     total_reward = 0.0
+    rr = np.zeros((n_agents,))
     for i_step in range(max_steps):
         obs = obs.type(FloatTensor)
         actions = maddpg.select_action(obs).data.cpu()
@@ -97,15 +99,24 @@ for i_episode in range(n_episode):
         else:
             next_obs = None
 
-        total_reward += reward.sum()     
+        total_reward += reward.sum()
+        rr += reward.cpu().numpy()
+        maddpg.memory.push(obs.data, actions, next_obs, reward)
+        
         obs = next_obs
 
-        # check if done
+        c_loss, a_loss = maddpg.update_policy()
+
+        
         if True in done:
             break
 
     maddpg.episode_done += 1
     print("Episode: {}, reward = {}".format(i_episode, total_reward))
+
+    # save model
+    if (maddpg.episode_done + 1 == n_episode):
+        maddpg.save(current_time, maddpg.episode_done)
 
 
 # ## Close Environment

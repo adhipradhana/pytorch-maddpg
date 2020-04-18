@@ -56,7 +56,7 @@ class MADDPG:
             self.approx_policies = [[ApproxPolicy(dim_obs, dim_act) if i != j else None for i in range(self.n_agents)] for j in range(self.n_agents)]
             self.approx_targets = deepcopy(self.approx_policies)
             self.approx_optimizer = [[Adam(x.parameters(),
-                                     lr=0.001) for x in approx_actor if x is not None] for approx_actor in self.approx_policies]
+                                     lr=0.001) if x is not None else None for x in approx_actor] for approx_actor in self.approx_policies]
 
         if self.use_cuda:
             for x in self.actors:
@@ -117,9 +117,12 @@ class MADDPG:
                 self.update_approx_policy(agent)
 
                 param_list = [self.approx_targets[agent][i](non_final_next_states[:,i,:]) if i != agent else None for i in range(self.n_agents)]
-                act_pd_n = [Normal(*param) if param is not None else None for param in param_list]
-                non_final_next_actions = [act_pd.sample() if act_pd is not None else None for act_pd in act_pd_n]
-                non_final_next_actions[agent] = self.actors_target[i](non_final_next_states[:,agent,:])
+                param_list = [list(torch.chunk(param, 2*self.n_actions)) if param is not None else None for param in param_list]
+                param_list = [[torch.split(x, self.n_actions, dim=1) for x in param] if param is not None else None for param in param_list]
+
+                act_pd_n = [[Normal(loc=x[0],scale=x[1]) for x in param] if param is not None else None for param in param_list]
+                non_final_next_actions = [torch.cat([x.sample() for x in act_pd]) if act_pd is not None else None for act_pd in act_pd_n]
+                non_final_next_actions[agent] = self.actors_target[agent](non_final_next_states[:,agent,:])
             else:
                 non_final_next_actions = [self.actors_target[i](non_final_next_states[:,i,:]) for i in range(self.n_agents)]
 
@@ -195,6 +198,9 @@ class MADDPG:
         return actions
 
     def update_approx_policy(self, agent_idx):
+        # Define type of tensor
+        FloatTensor = torch.cuda.FloatTensor if self.use_cuda else torch.FloatTensor
+
         # implementing infering policy of other's agent
         # get latest sample
         latest_sample = self.memory.latest_sample()
@@ -206,13 +212,15 @@ class MADDPG:
         # update for each approx policy
         for i in range(self.n_agents):
             if i == agent_idx: continue
-
             # run neural network for getting param
             self.approx_optimizer[agent_idx][i].zero_grad()
             param = self.approx_policies[agent_idx][i](latest_state[i,:])
+            param = param.unsqueeze(0)
 
             ## create normal distribution from param
-            act_pd = Normal(*param)
+            param = torch.split(param, self.n_actions, dim=1)
+
+            act_pd = Normal(loc=param[0], scale=param[1])
 
             # get sample act
             act_sample = act_pd.sample()
@@ -261,6 +269,13 @@ class MADDPG:
             checkpoint['actor_optimizer_{}'.format(i)] = self.actor_optimizer[i].state_dict()
             checkpoint['critic_optimizer_{}'.format(i)] = self.critic_optimizer[i].state_dict()
             checkpoint['var_{}'.format(i)] = self.var[i]
+
+            if self.use_approx:
+                for j in range(self.n_agents):
+                    if i != j:
+                        checkpoint['approx_policy_{}_{}'.format(i, j)] = self.approx_policies[i][j].state_dict()
+                        checkpoint['approx_target_{}_{}'.format(i, j)] = self.approx_targets[i][j].state_dict()
+                        checkpoint['approx_optimizer_{}_{}'.format(i, j)] = self.approx_optimizer[i][j].state_dict()
         
         # saving model info
         checkpoint['n_agents'] = self.n_agents
@@ -283,9 +298,15 @@ class MADDPG:
             self.critic_optimizer[i].load_state_dict(checkpoint['critic_optimizer_{}'.format(i)])
             self.var[i] = checkpoint['var_{}'.format(i)]
 
+            if self.use_approx:
+                for j in range(self.n_agents):
+                    if i != j:
+                        self.approx_policies[i][j].load_state_dict(checkpoint['approx_policy_{}_{}'.format(i, j)])
+                        self.approx_targets[i][j].load_state_dict(checkpoint['approx_target_{}_{}'.format(i, j)])
+                        self.approx_optimizer[i][j].load_state_dict(checkpoint['approx_optimizer_{}_{}'.format(i, j)])
+
     def load_all_agent(self, path, model_number, map_location):
         '''strictly for testing, do not use for resume training due to critic's network's size differents'''
-
         checkpoint = torch.load(path, map_location=map_location)
 
         #loading from 1 agent
@@ -300,7 +321,6 @@ class MADDPG:
 
     def load_agent(self, path, agent_number, model_number, map_location):
         '''strictly for testing, do not use for resume training due to critic's network's size differents'''
-
         checkpoint = torch.load(path, map_location=map_location)
 
         #loading from 1 agent

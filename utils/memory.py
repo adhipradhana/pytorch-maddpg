@@ -23,4 +23,4 @@ class ReplayMemory:
         return len(self.memory)
 
     def latest_sample(self):
-        return [self.memory[self.position]]
+        return [self.memory[self.position-1]]
