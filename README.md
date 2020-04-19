@@ -12,5 +12,9 @@ Original implementer by [xuehy](https://github.com/xuehy). Modified for compatib
 
 ## Dependency
 
-- [pytorch](https://github.com/pytorch/pytorch)
-- Python 3.7.6 (recommend using the anaconda/miniconda)
+- [PyTorch 1.4.0](https://github.com/pytorch/pytorch)
+- Python 3.7.6 (recommended using the anaconda/miniconda)
+- Visdom
+
+## Policy Inferring
+Policy Inferring is implemented, but I can't calculate the KL Divergence. Make sure to change the distribution based on your environment.
