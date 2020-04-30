@@ -53,6 +53,7 @@ max_steps = 10
 buffer_capacity = 1000
 batch_size = 7
 episodes_before_train = 5
+checkpoint_episode = 15
 
 
 # In[ ]:
@@ -115,7 +116,7 @@ for i_episode in range(n_episode):
     print("Episode: {}, reward = {}".format(i_episode, total_reward))
 
     # save model
-    if (maddpg.episode_done + 1 == n_episode):
+    if (maddpg.episode_done % checkpoint_episode == 0):
         maddpg.save(current_time, maddpg.episode_done)
 
 
